@@ -18,3 +18,8 @@ The key difference from existing services is the preliminary approval probabilit
 A special focus is placed on the conditions of Kyrgyzstan. The platform takes into account weak internet access in rural regions and provides basic offline access through SMS or USSD for checking application status and receiving offers. All information is presented in simple language, including support for the Kyrgyz language, with clear explanations of real overpayment and risks, so that the product is understandable even for people without a financial background.
 
 Thus, the project solves several problems at once: it improves financial accessibility, reduces the number of unjustified rejections, helps people make more informed decisions, and creates value for banks through higher-quality leads. This makes the product not a copy of existing aggregators, but an infrastructure-level fintech solution that can scale within the country and to other markets with similar challenges.
+Competitors: Mkopo Rahisi (InVenture) (Kenya)
+Credit Karma (USA)
+Upstart (USA)
+Borrowell (Canada)
+LendingTree (USA)
