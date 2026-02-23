@@ -1,6 +1,6 @@
 name: finway_app
 description: Fintech credit navigator prototype
-version: 0.1.0
+version: 0.2.0
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -8,3 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.2
+
+flutter:
+  uses-material-design: true
