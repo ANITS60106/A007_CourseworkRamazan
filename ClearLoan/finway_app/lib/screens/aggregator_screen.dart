@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/mock_offers.dart';
-import '../models/bank_offer.dart';
+import '../services/app_settings.dart';
 import '../services/i18n.dart';
-import '../widgets/bank_offer_card.dart';
-import '../services/api_client.dart';
+import '../services/products_service.dart';
+import '../models/loan_product.dart';
+import 'bank_details_screen.dart';
 
 class AggregatorScreen extends StatefulWidget {
   const AggregatorScreen({super.key});
@@ -13,203 +13,243 @@ class AggregatorScreen extends StatefulWidget {
 }
 
 class _AggregatorScreenState extends State<AggregatorScreen> {
-  final _search = TextEditingController();
-  int _filter = 0; // 0 all, 1 low rate, 2 short, 3 long
-
-  late Future<List<BankOffer>> _load;
+  late Future<List<LoanProduct>> _future;
+  String _q = '';
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
-    _load = _fetchOffers();
+    _future = ProductsService.listProducts();
   }
 
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  Future<List<BankOffer>> _fetchOffers() async {
-    try {
-      final list = await ApiClient.getList('/api/loans/offers/');
-      final offers = list
-          .whereType<Map<String, dynamic>>()
-          .map(BankOffer.fromOfferJson)
-          .toList();
-      return offers.isEmpty ? List<BankOffer>.from(mockOffers) : offers;
-    } catch (_) {
-      return List<BankOffer>.from(mockOffers);
-    }
-  }
-
-  List<BankOffer> _applyFilters(List<BankOffer> base) {
-    var list = List<BankOffer>.from(base);
-
-    final q = _search.text.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list.where((o) => o.bankName.toLowerCase().contains(q)).toList();
-    }
-
-    if (_filter == 1) {
-      list = list.where((o) => o.status != OfferStatus.rejected && o.rate <= 20).toList();
-    } else if (_filter == 2) {
-      list = list.where((o) => o.status != OfferStatus.rejected && o.months <= 24).toList();
-    } else if (_filter == 3) {
-      list = list.where((o) => o.status != OfferStatus.rejected && o.months >= 36).toList();
-    }
-
-    list.sort((a, b) => a.status.index.compareTo(b.status.index));
-    return list;
+  void _reload() {
+    _future = ProductsService.listProducts(q: _q, filter: _filter);
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
 
-    return Scaffold(
-      appBar: AppBar(title: Text(I18n.t('aggregator'))),
-      body: SafeArea(
-        child: FutureBuilder(
-          future: _load,
-          builder: (context, snap) {
-            final base = snap.data ?? mockOffers;
-            final offers = _applyFilters(base);
-
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        I18n.t('best_matches'),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(I18n.t('aggregator'), style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            TextField(
+              onChanged: (v) {
+                setState(() {
+                  _q = v.trim();
+                  _reload();
+                });
+              },
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                labelText: I18n.t('search_by_bank'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _chip('all', I18n.t('filter_all')),
+                  _chip('low', I18n.t('filter_low')),
+                  _chip('short', I18n.t('filter_short')),
+                  _chip('long', I18n.t('filter_long')),
+                  _chip('high_amount', I18n.t('filter_high_amount')),
+                  _chip('best_value', I18n.t('filter_best_value')),
+                  _chip('no_collateral', I18n.t('filter_no_collateral')),
+                  _chip('islamic', I18n.t('filter_islamic')),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: FutureBuilder<List<LoanProduct>>(
+                future: _future,
+                builder: (_, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return Center(
+                      child: Text(
+                        'Backend is not reachable. Start Django server, then refresh.',
+                        style: TextStyle(color: cs.error, fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _search,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: I18n.t('search_by_bank'),
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _search.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  onPressed: () {
-                                    _search.clear();
-                                    setState(() {});
-                                  },
-                                  icon: const Icon(Icons.close),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _chip(I18n.t('filter_all'), 0, cs),
-                            const SizedBox(width: 8),
-                            _chip(I18n.t('filter_low'), 1, cs),
-                            const SizedBox(width: 8),
-                            _chip(I18n.t('filter_short'), 2, cs),
-                            const SizedBox(width: 8),
-                            _chip(I18n.t('filter_long'), 3, cs),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: offers.length + 1,
-                    itemBuilder: (_, i) {
-                      if (i == offers.length) {
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-                          child: _SponsorFooter(cs: cs),
-                        );
-                      }
-                      return BankOfferCard(offer: offers[i]);
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: (snap.data ?? []).length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _ProductCard(
+                      product: (snap.data ?? [])[i],
+                      filter: _filter,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                '${I18n.t('sponsored_by')}: Айыл Банк',
+                style: TextStyle(color: cs.onBackground.withOpacity(0.55), fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _chip(String text, int value, ColorScheme cs) {
-    final selected = _filter == value;
-    return ChoiceChip(
-      label: Text(text),
-      selected: selected,
-      onSelected: (_) => setState(() => _filter = value),
-      selectedColor: cs.primary.withOpacity(0.16),
-      backgroundColor: cs.surface,
-      labelStyle: TextStyle(
-        color: selected ? cs.primary : Colors.black.withOpacity(0.75),
-        fontWeight: FontWeight.w700,
+  Widget _chip(String value, String label) {
+    final active = _filter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        selected: active,
+        label: Text(label),
+        onSelected: (_) {
+          setState(() {
+            _filter = value;
+            _reload();
+          });
+        },
       ),
-      side: BorderSide(color: Colors.black.withOpacity(0.08)),
     );
   }
 }
 
-class _SponsorFooter extends StatelessWidget {
-  final ColorScheme cs;
-  const _SponsorFooter({required this.cs});
+class _ProductCard extends StatelessWidget {
+  final LoanProduct product;
+  final String filter;
+
+  const _ProductCard({
+    required this.product,
+    required this.filter,
+  });
+
+  String _bankName(BuildContext context) {
+    final lang = AppSettings.language.value;
+    if (lang == 'ru') return product.bankNameRu;
+    if (lang == 'ky') return product.bankNameKy;
+    return product.bankNameEn;
+  }
+
+  String _title(BuildContext context) {
+    final lang = AppSettings.language.value;
+    if (lang == 'ru') return product.titleRu;
+    if (lang == 'ky') return product.titleKy;
+    return product.titleEn;
+  }
+
+  String _rateLabel() {
+    final from = product.rateFrom.toStringAsFixed(1);
+    final to = product.rateTo.toStringAsFixed(1);
+    if (product.rateFrom == product.rateTo || product.rateTo == 0) return '$from%';
+    return '$from–$to%';
+  }
+
+  String _amountLabel() {
+    return '${product.minAmount}–${product.maxAmount}';
+  }
+
+  String _termLabel() {
+    return '${product.minMonths}–${product.maxMonths}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => BankDetailsScreen(code: product.bankCode)),
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+              color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.06),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.account_balance, color: cs.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_bankName(context), style: const TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text(
+                    _title(context),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _tag(context, Icons.percent, _rateLabel()),
+                      _tag(context, Icons.payments, _amountLabel()),
+                      _tag(context, Icons.schedule, _termLabel()),
+                      if (product.isIslamic) _tag(context, Icons.mosque, I18n.t('filter_islamic')),
+                      if ((product.collateral).toLowerCase().contains('none') || product.collateral.isEmpty)
+                        _tag(context, Icons.shield_outlined, I18n.t('filter_no_collateral')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tag(BuildContext context, IconData icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        color: cs.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.primary.withOpacity(0.20)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.account_balance, color: cs.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  I18n.t('sponsored_by'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.black.withOpacity(0.55),
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Айыл Банк',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: cs.primary,
-                      ),
-                ),
-              ],
-            ),
-          ),
+          Icon(icon, size: 14, color: cs.primary),
+          const SizedBox(width: 6),
+          Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.primary)),
         ],
       ),
     );

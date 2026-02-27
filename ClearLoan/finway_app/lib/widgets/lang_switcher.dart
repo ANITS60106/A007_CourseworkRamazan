@@ -20,7 +20,7 @@ class LangSwitcher extends StatelessWidget {
           showSelectedIcon: false,
           onSelectionChanged: (set) {
             if (set.isEmpty) return;
-            AppSettings.language.value = set.first;
+            AppSettings.setLanguage(set.first);
           },
           style: ButtonStyle(
             visualDensity: VisualDensity.compact,

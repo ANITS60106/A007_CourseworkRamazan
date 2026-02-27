@@ -1,230 +1,195 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import '../services/credit_history_service.dart';
+import '../services/api_client.dart';
 import '../services/i18n.dart';
-import '../widgets/app_card.dart';
-import '../widgets/lang_switcher.dart';
-import 'login_screen.dart';
+import '../services/pin_service.dart';
+import 'welcome_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, dynamic>? _summary;
+  List<dynamic> _entries = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() => _loading = true);
+    try {
+      final summary = await ApiClient.get('/api/loans/credit-history/summary/');
+      final entries = await ApiClient.get('/api/loans/credit-history/');
+      if (!mounted) return;
+      setState(() {
+        _summary = summary as Map<String, dynamic>;
+        _entries = (entries as List);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    await PinService.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = AuthService.currentUser;
     final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(I18n.t('profile')),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Center(child: LangSwitcher()),
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(I18n.t('profile'), style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user?.fullName ?? '-', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 6),
+                Text('${I18n.t('phone')}: ${user?.phone ?? '-'}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('${I18n.t('passport_id')}: ${user?.passportIdMasked ?? '-'}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('${I18n.t('occupation')}: ${user?.occupation ?? '-'}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('${I18n.t('monthly_income')}: ${user?.monthlyIncome ?? 0}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600)),
+                if ((user?.userType ?? 'individual') == 'legal') ...[
+                  const SizedBox(height: 8),
+                  Text('${I18n.t('company_name')}: ${user?.companyName ?? '-'}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w700)),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: Text(I18n.t('credit_history'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
+              if (!_loading)
+                IconButton(
+                  onPressed: _loadHistory,
+                  icon: const Icon(Icons.refresh),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (_loading) const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())),
+          if (!_loading && _entries.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+              ),
+              child: Text(I18n.t('no_history'), style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+
+          if (_summary != null && _entries.isNotEmpty) ...[
+            _ScoreCard(summary: _summary!),
+            const SizedBox(height: 10),
+            ..._entries.take(6).map((e) => _HistoryItem(entry: e)),
+          ],
+
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: Text(I18n.t('logout')),
           ),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    );
+  }
+}
+
+class _ScoreCard extends StatelessWidget {
+  final Map<String, dynamic> summary;
+  const _ScoreCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final score = (summary['score'] ?? 0).toString();
+    final counts = (summary['counts'] ?? {}) as Map<String, dynamic>;
+
+    int ontime = (counts['ontime'] ?? 0) as int;
+    int late = (counts['late'] ?? 0) as int;
+    int def = (counts['default'] ?? 0) as int;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.stacked_line_chart, color: cs.primary),
+              const SizedBox(width: 10),
+              Text('${I18n.t('score')}: $score', style: const TextStyle(fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _pill(context, 'On-time', ontime, cs.primary),
+              const SizedBox(width: 8),
+              _pill(context, 'Late', late, Colors.orange),
+              const SizedBox(width: 8),
+              _pill(context, 'Default', def, cs.error),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pill(BuildContext context, String label, int value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.22)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: cs.primary.withOpacity(0.14),
-                    child: Text(
-                      (user?.fullName.isNotEmpty == true) ? user!.fullName[0].toUpperCase() : 'U',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: cs.primary),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.fullName ?? 'Demo User',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user?.phone ?? '+996 ...',
-                          style: TextStyle(color: Colors.black.withOpacity(0.55)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _RowField(title: I18n.t('passport_id'), value: user?.passportIdMasked ?? '—'),
-                  const Divider(),
-                  _RowField(title: I18n.t('workplace'), value: user?.workplace.isNotEmpty == true ? user!.workplace : '—'),
-                  const Divider(),
-                  _RowField(title: I18n.t('occupation'), value: user?.occupation.isNotEmpty == true ? user!.occupation : '—'),
-                  const Divider(),
-                  _RowField(title: I18n.t('income'), value: '${user?.monthlyIncome ?? 0} сом'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            AppCard(
-              margin: EdgeInsets.zero,
-              child: FutureBuilder(
-                future: Future.wait([
-                  CreditHistoryService.fetchSummary(),
-                  CreditHistoryService.fetchEntries(),
-                ]),
-                builder: (context, snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final list = (snap.data?[1] as List?) ?? const [];
-                  final summary = (snap.data?[0] as Map<String, dynamic>?) ?? const {};
-                  final score = (summary['score'] ?? 0) as int;
-                  final counts = (summary['counts'] as Map?) ?? const {};
-                  final ontime = (counts['ontime'] ?? 0) as int;
-                  final late = (counts['late'] ?? 0) as int;
-                  final defaults = (counts['default'] ?? 0) as int;
-
-                  if (list.isEmpty) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(I18n.t('credit_history'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 8),
-                        Text(
-                          I18n.t('credit_history_empty'),
-                          style: TextStyle(color: Colors.black.withOpacity(0.55)),
-                        ),
-                      ],
-                    );
-                  }
-
-                  final maxCount = [ontime, late, defaults].fold<int>(1, (m, e) => e > m ? e : m);
-
-                  Widget bar(String label, int v) => Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(label, style: TextStyle(color: Colors.black.withOpacity(0.55), fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                value: v / maxCount,
-                                minHeight: 10,
-                                backgroundColor: Colors.black.withOpacity(0.06),
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  label == I18n.t('ontime')
-                                      ? cs.primary
-                                      : (label == I18n.t('late') ? Colors.orange : cs.error),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text('$v', style: const TextStyle(fontWeight: FontWeight.w900)),
-                          ],
-                        ),
-                      );
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(I18n.t('credit_history'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: cs.primary.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              I18n.t('score_badge').replaceAll('{score}', score.toString()),
-                              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          bar(I18n.t('ontime'), ontime),
-                          const SizedBox(width: 10),
-                          bar(I18n.t('late'), late),
-                          const SizedBox(width: 10),
-                          bar(I18n.t('default'), defaults),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        I18n.t('recent_records'),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: 8),
-                      ...list.take(3).map((e) {
-                        final m = e as dynamic;
-                        final provider = (m.providerName ?? '') as String;
-                        final status = (m.status ?? 'ontime') as String;
-                        final amount = (m.originalAmount ?? 0) as int;
-                        final statusLabel = status == 'ontime'
-                            ? I18n.t('ontime')
-                            : (status == 'late' ? I18n.t('late') : I18n.t('default'));
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
-                            children: [
-                              Icon(Icons.receipt_long, color: cs.primary),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(provider, style: const TextStyle(fontWeight: FontWeight.w900)),
-                                    const SizedBox(height: 2),
-                                    Text('$amount сом • $statusLabel', style: TextStyle(color: Colors.black.withOpacity(0.55))),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            OutlinedButton.icon(
-              icon: Icon(Icons.logout, color: cs.error),
-              label: Text(I18n.t('logout')),
-              onPressed: () {
-                AuthService.logout();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (_) => false,
-                );
-              },
-            ),
+            Text('$value', style: TextStyle(fontWeight: FontWeight.w900, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), fontWeight: FontWeight.w700, fontSize: 12)),
           ],
         ),
       ),
@@ -232,32 +197,55 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _RowField extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _RowField({required this.title, required this.value});
+class _HistoryItem extends StatelessWidget {
+  final dynamic entry;
+  const _HistoryItem({required this.entry});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    final cs = Theme.of(context).colorScheme;
+    final provider = (entry['provider_name'] ?? '-') as String;
+    final status = (entry['status'] ?? '-') as String;
+    final amt = (entry['original_amount'] ?? 0).toString();
+    final late = (entry['late_payments'] ?? 0).toString();
+
+    Color color() => switch (status) {
+          'ontime' => cs.primary,
+          'late' => Colors.orange,
+          _ => cs.error,
+        };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+      ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(color: Colors.black.withOpacity(0.55), fontWeight: FontWeight.w700),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color().withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: Icon(Icons.receipt_long, color: color()),
           ),
           const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(provider, style: const TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text('$amt KGS • late: $late', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600, fontSize: 12)),
+              ],
             ),
           ),
+          Text(status.toUpperCase(), style: TextStyle(color: color(), fontWeight: FontWeight.w900)),
         ],
       ),
     );

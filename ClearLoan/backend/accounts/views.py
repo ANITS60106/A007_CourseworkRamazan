@@ -26,6 +26,14 @@ class RegisterView(APIView):
             workplace=data.get('workplace', ''),
             occupation=data.get('occupation', ''),
             monthly_income=data.get('monthly_income', 0),
+            user_type=data.get('user_type','individual'),
+            company_name=data.get('company_name',''),
+            company_inn=data.get('company_inn',''),
+            company_address=data.get('company_address',''),
+            company_phone=data.get('company_phone',''),
+            company_fax=data.get('company_fax',''),
+            company_director=data.get('company_director',''),
+            company_profit_monthly=data.get('company_profit_monthly',0),
         )
         token, _ = Token.objects.get_or_create(user=user)
         return Response({'token': token.key, 'user': UserSerializer(user).data})

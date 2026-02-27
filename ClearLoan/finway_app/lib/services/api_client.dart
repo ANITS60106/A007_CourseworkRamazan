@@ -74,6 +74,22 @@ class ApiClient {
     throw ApiException(res.statusCode, decoded);
   }
 
+  /// Convenience GET that returns decoded JSON (List or Map).
+  /// Keeps the rest of the codebase simpler.
+  static Future<dynamic> get(
+    String path, {
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final res = await http.get(uri, headers: _withAuth(headers));
+
+    final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(res.statusCode, decoded);
+  }
+
   static Future<Map<String, dynamic>> getMap(
       String path, {
         Map<String, String>? headers,

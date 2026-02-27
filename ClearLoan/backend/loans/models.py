@@ -60,3 +60,85 @@ class CreditHistoryEntry(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class Bank(models.Model):
+    code = models.SlugField(max_length=50, unique=True)
+    name_en = models.CharField(max_length=120)
+    name_ru = models.CharField(max_length=120)
+    name_ky = models.CharField(max_length=120)
+
+    website = models.URLField(blank=True)
+    support_phone = models.CharField(max_length=80, blank=True)
+
+    hq_address_en = models.CharField(max_length=220, blank=True)
+    hq_address_ru = models.CharField(max_length=220, blank=True)
+    hq_address_ky = models.CharField(max_length=220, blank=True)
+
+    about_en = models.TextField(blank=True)
+    about_ru = models.TextField(blank=True)
+    about_ky = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name_en
+
+
+class BankBranch(models.Model):
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name='branches')
+    city = models.CharField(max_length=120, blank=True)
+    address_en = models.CharField(max_length=220)
+    address_ru = models.CharField(max_length=220)
+    address_ky = models.CharField(max_length=220)
+    hours = models.CharField(max_length=120, blank=True)
+
+    def __str__(self):
+        return f"{self.bank.code}: {self.city}"
+
+
+class LoanProduct(models.Model):
+    LOAN_TYPE_CHOICES = LoanRequest.TYPE_CHOICES
+
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name='products')
+    loan_type = models.CharField(max_length=20, choices=LOAN_TYPE_CHOICES, default='consumer')
+
+    title_en = models.CharField(max_length=160)
+    title_ru = models.CharField(max_length=160)
+    title_ky = models.CharField(max_length=160)
+
+    min_amount = models.IntegerField(default=0)
+    max_amount = models.IntegerField(default=0)
+    min_months = models.IntegerField(default=3)
+    max_months = models.IntegerField(default=60)
+
+    rate_from = models.FloatField(default=0)
+    rate_to = models.FloatField(default=0)
+
+    collateral = models.CharField(max_length=120, blank=True)  # e.g. none / pledge / guarantor
+    is_islamic = models.BooleanField(default=False)
+
+    desc_en = models.TextField(blank=True)
+    desc_ru = models.TextField(blank=True)
+    desc_ky = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.bank.code} {self.loan_type} {self.title_en}"
+
+
+class LoanApplication(models.Model):
+    STATUS_CHOICES = [
+        ('approved', 'Approved'),
+        ('alternative', 'Alternative'),
+        ('rejected', 'Rejected'),
+        ('pending', 'Pending'),
+    ]
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='applications')
+    product = models.ForeignKey(LoanProduct, on_delete=models.CASCADE, related_name='applications')
+    amount = models.IntegerField()
+    months = models.IntegerField()
+    monthly_payment = models.IntegerField(default=0)
+    decision_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    approval_probability = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']

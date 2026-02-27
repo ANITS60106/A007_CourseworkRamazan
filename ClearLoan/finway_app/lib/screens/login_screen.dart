@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/i18n.dart';
-import '../theme/app_theme.dart';
-import '../widgets/app_card.dart';
 import '../widgets/lang_switcher.dart';
-import 'register_screen.dart';
 import 'home_shell.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,25 +32,20 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final err = await AuthService.login(
-      phone: _phone.text,
-      password: _password.text,
-    );
+    final err = await AuthService.login(phone: _phone.text, password: _password.text);
 
     if (!mounted) return;
 
+    setState(() => _loading = false);
+
     if (err != null) {
-      setState(() {
-        _loading = false;
-        _error = err;
-      });
+      setState(() => _error = err);
       return;
     }
 
-    setState(() => _loading = false);
-
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeShell()),
+      (_) => false,
     );
   }
 
@@ -65,52 +58,31 @@ class _LoginScreenState extends State<LoginScreen> {
         child: ListView(
           padding: const EdgeInsets.all(18),
           children: [
+            const SizedBox(height: 18),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Spacer(),
+                Text(I18n.t('app_name'), style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
                 const LangSwitcher(),
               ],
             ),
             const SizedBox(height: 18),
-            Center(
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTheme.brandGreen.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.account_balance, color: AppTheme.brandGreen, size: 34),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: cs.primary.withOpacity(0.22)),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              I18n.t('app_name'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Fintech credit navigator (prototype)',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black.withOpacity(0.55)),
-            ),
-            const SizedBox(height: 18),
-
-            AppCard(
-              margin: EdgeInsets.zero,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(I18n.t('login'), style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 14),
+                  Text(I18n.t('login'), style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _phone,
                     keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: I18n.t('phone'),
-                      hintText: '+996 700 123 456',
-                    ),
+                    decoration: InputDecoration(labelText: I18n.t('phone'), hintText: '+996 ...'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -124,41 +96,32 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    child: _error == null
-                        ? const SizedBox(height: 0, key: ValueKey('noerr'))
-                        : Padding(
-                            key: const ValueKey('err'),
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Text(_error!, style: TextStyle(color: cs.error, fontWeight: FontWeight.w600)),
-                          ),
-                  ),
-                  const SizedBox(height: 16),
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_error!, style: TextStyle(color: cs.error, fontWeight: FontWeight.w800)),
+                  ],
+                  const SizedBox(height: 14),
                   ElevatedButton(
                     onPressed: _loading ? null : _doLogin,
                     child: _loading
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : Text(I18n.t('login')),
                   ),
-                  const SizedBox(height: 10),
-                  OutlinedButton(
-                    onPressed: _loading
-                        ? null
-                        : () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                            ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
                     child: Text(I18n.t('registration')),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 14),
             Text(
-              'Tip: start Django backend on port 8000 for real DB. Otherwise, the app uses local demo auth.',
+              '${I18n.t('sponsored_by')}: Айыл Банк',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black.withOpacity(0.45), fontSize: 12),
+              style: TextStyle(color: cs.onBackground.withOpacity(0.55), fontWeight: FontWeight.w700),
             ),
           ],
         ),
