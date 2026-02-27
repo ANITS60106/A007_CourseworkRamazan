@@ -54,7 +54,7 @@ Progress of week 004:
 - Footer: The first section will contain an aggregator, the second a "basket" of current loans, the third section where you enter the loan terms and the one you want, and the fourth section a profile where you can see your details, including your current employment status.
 - At least some design and UI have been added, and in a red-green color scheme. Also, add a switcher where you can change the language (either Russian or Kyrgyz).
 
-Progress of week 005:
+## Progress of week 005:
 Slightly improved the overall UI. The color scheme was adjusted toward a brighter green-white fintech style, replacing the previous darker tone. Basic spacing, typography, and card components were cleaned up to make the interface look more structured, though the design is still relatively simple and not fully polished.
 
 Added a loan type selector in the “Request” section. Users can now choose between several basic options (for example: mortgage, consumer loan, etc.). The logic behind recommendations remains prototype-level and does not yet reflect real scoring or approval systems.
@@ -92,7 +92,7 @@ Profile (user information and logout)
 Added light animations (page transitions and minor UI effects). These are basic Flutter animations and do not yet represent a fully production-ready motion system.
 
 
-Progress of Week 006:
+ ## Progress of Week 006:
 
 The overall structure of the ClearLoan application was significantly refined to better reflect the concept of a financial navigator rather than a simple loan comparison tool. The interface was visually unified across all main screens, improving consistency in typography, spacing, and component hierarchy. The design now follows a clearer green-white fintech style with improved readability and simplified visual elements. Navigation responsiveness and screen transitions were slightly optimized to provide smoother interaction, although animations remain lightweight and prototype-level.
 
@@ -111,3 +111,66 @@ The main aggregator screen now includes sponsor attribution displayed at the bot
 Loan request functionality was improved with clearer input structure and validation feedback. Users can now select loan purpose categories and receive recommendations generated through backend evaluation rather than static responses. The overall request flow better reflects a guided financial decision process.
 
 Additional internal improvements were introduced, including cleaner API communication structure, improved state handling between screens, and preparation for future offline-friendly logic described in the technical specification. While the system remains an MVP prototype, it now demonstrates a more realistic interaction between frontend interface, backend analysis, and user financial data management.
+
+
+## Progress of Week 006 (2)
+
+During Week 006, the ClearLoan project was significantly improved to better demonstrate a realistic fintech mobile application rather than only a visual prototype. The main focus of this stage was to enhance system interaction, simulate real financial behavior, improve usability, and prepare the application for presentation and evaluation.
+
+One of the major improvements was the creation of a simulated database containing **25 predefined users**, each having different personal and financial characteristics. These users were generated to imitate real banking clients with different credit situations. Some users have a clean credit history, some contain delayed payments, while others have mixed or completely empty credit records. This allows the system to demonstrate how loan recommendations and approval decisions change depending on the applicant’s financial profile instead of always returning identical results.
+
+All demo users can be accessed directly for testing purposes. Every generated user shares the same password, which simplifies evaluation of the system functionality.
+
+Example login credentials:
+
+Phone: +996700100000  
+Password: demo12345  
+
+Phone: +996700100005  
+Password: demo12345  
+
+Phone: +996700100012  
+Password: demo12345  
+
+Phone: +996700100018  
+Password: demo12345  
+
+Phone: +996700100024  
+Password: demo12345  
+
+Any phone number within the following range can be used to log into the system:
+
++996700100000 — +996700100024  
+
+After logging in for the first time, the application requests users to create a **4-digit PIN code**, allowing faster authentication on future launches without repeatedly entering login credentials. This behavior simulates modern mobile banking applications.
+
+The Aggregator section of the application was redesigned so that banks are no longer displayed as static text elements. Each bank is now implemented as an interactive widget. When a user selects a bank, the application opens a dedicated Bank Details screen containing structured information such as headquarters address, branch locations, available credit products, interest rates, and repayment conditions. This change transforms the aggregator into a functional financial marketplace rather than a simple informational list.
+
+The loan request process was also expanded into a full multi-step workflow. Users now select loan type, requested amount, and repayment period, after which the request is sent to the backend scoring system. The backend analyzes available data including income level, occupation, and simulated credit history. Based on this analysis, the system returns a list of banks sorted by estimated approval probability. Banks with a higher chance of approval appear first. After choosing a bank, the user proceeds to a confirmation screen where complete loan information is displayed again, including selected bank, loan conditions, repayment duration, and calculated monthly payment. The user then confirms the application, which is stored in the backend and becomes visible inside the Loans Basket section.
+
+Filtering functionality inside the Aggregator was converted from visual placeholders into a working backend-driven system. Loan offers can now be filtered according to multiple parameters such as loan type, repayment duration, interest level, or general suitability. The filters now actively request filtered data from the backend instead of only modifying the interface visually.
+
+The onboarding process was extended with a structured welcome screen where users select application theme (light or dark mode) and choose between **Individual** and **Legal Entity** account types. Registration for legal entities now includes additional company information such as company name, tax identification number (INN), company address, fax number, contact phone, director information, and estimated monthly profit. This allows the application to demonstrate support for both personal and business clients.
+
+During this development stage, visual branding of the application was also completed. A dedicated **ClearLoan logo** and a promotional **mobile application poster** were designed to establish a recognizable fintech identity. These elements improve presentation quality and make the project closer to a real commercial product ready for demonstration.
+
+The Django backend architecture was further refined to clearly separate authentication, loan aggregation, scoring logic, and user profile management. The application now communicates through structured API endpoints responsible for authentication, loan retrieval, recommendation generation, application submission, and credit history access.
+
+Main endpoints used in the system include:
+
+POST /api/auth/register/  
+POST /api/auth/login/  
+
+GET /api/loans/products/  
+GET /api/loans/banks/<code>/  
+
+GET /api/loans/options/scored/  
+POST /api/loans/applications/apply/  
+
+GET /api/loans/applications/  
+GET /api/loans/credit-history/  
+GET /api/profile/  
+
+The Profile section was enhanced with a credit history module that displays previously submitted or active loans together with their statuses. If a user has no prior credit activity, the section remains empty, reflecting realistic system behavior rather than displaying placeholder information.
+
+Overall, by the end of Week 006, ClearLoan evolved into a functional MVP demonstrating interaction between frontend interface, backend decision logic, simulated financial data, and user-centered loan navigation. The project now represents a working prototype of a financial navigator adapted to the needs of users in Kyrgyzstan and suitable for live demonstration.
